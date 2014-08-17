@@ -3,18 +3,117 @@
 
 ## Loading and preprocessing the data
 
+```{r}
+activity <- read.csv("activity.csv")
+activity_complete <- activity[complete.cases(activity),] # strip out NAs
+```
 
 
 ## What is mean total number of steps taken per day?
 
+```{r}
+total_steps <- aggregate(activity_complete$steps, list(activity_complete$date), sum)
+hist(total_steps$x, main="Total Steps per Day Oct + Nov 2012",xlab="Steps")
+mean_ts<-mean(total_steps$x)
+med_ts<-median(total_steps$x)
+```
 
+The mean of daily total steps in sample period is `r mean_ts`.
+
+The median of daily total steps in sample period is `r med_ts`.
 
 ## What is the average daily activity pattern?
 
+```{r}
+library (ggplot2)
+mean_steps <- aggregate(activity_complete$steps, list(activity_complete$interval), mean)
+
+d<-ggplot(mean_steps,aes(Group.1,x))
+d<-d+geom_line()+xlab("Interval")+ylab("Mean Steps")+ggtitle("Mean Steps October + November 2012")
+d
+
+# determine max number of steps during any period and the period inverval
+max_mean_steps<-0
+max_interval<-0
+for (i in 1:nrow(mean_steps))
+  if(mean_steps[i,2]>max_mean_steps) {
+    max_mean_steps<-mean_steps[i,2]
+    max_interval<-mean_steps[i,1]
+}
+
+```
+
+Maximum number of steps was `r max_mean_steps` at time interval `r max_interval`.
 
 
 ## Imputing missing values
 
+```{r}
+missing <- nrow(activity[!complete.cases(activity),])
+```
 
+There are `r missing` rows containing missing data
+
+Filling in missing data
+Determine Means for each time interval
+```{r}
+activity_imp <- activity  # create a new data frame to hold activity data with imputations
+# using existing data, create median number of steps per time interval
+intervals = unique(activity$interval)
+nintervals = length(intervals)
+meanstep = numeric(nintervals)
+for(i in 1:nintervals)
+  meanstep[i]=median(activity$steps[activity$interval==intervals[i]],na.rm=TRUE)
+# use the median data collected above to fill the NAs
+for(i in 1:dim(activity)[1])
+  if (is.na(activity[i,1]))
+    activity_imp[i,1]=meanstep[which(intervals==activity[i,3])]
+# determine if missing data remains
+missing <- nrow(activity_imp[!complete.cases(activity_imp),])
+
+# create new histogram, mean and median statistics from imputed data
+total_steps <- aggregate(activity_imp$steps, list(activity_imp$date), sum)
+hist(total_steps$x, main="Total Steps per Day Oct + Nov 2012 (Imputed Data)",xlab="Steps")
+mean_ts<-mean(total_steps$x)
+med_ts<-median(total_steps$x)
+
+# regenerate profile of daily activity (won't be too different if we use mean or median to fill data)
+mean_steps <- aggregate(activity_imp$steps, list(activity_imp$interval), mean)
+d<-ggplot(mean_steps,aes(Group.1,x))
+d<-d+geom_line()+xlab("Interval")+ylab("Mean Steps")+ggtitle("Mean Steps October + November 2012 (Imputed Data Set)")
+d
+```
+
+There are `r missing` rows containing missing data in the imputed data set.
+
+The mean of daily total steps in sample period imputing missing data is `r mean_ts`.
+
+The median of daily total steps in sample period imputing missing data is `r med_ts`.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+# categorize down weekend and weekday observations
+activity_complete$weekday = weekdays(as.Date(activity_complete$date))
+activity_complete["day_type"] <- NA
+activity_complete$day_type[!(activity_complete$weekday == "Saturday
+" | activity_complete$weekday == "Sunday")] <- "Weekday"
+activity_complete$day_type[activity_complete$weekday == "Saturday" | activity_complete$weekday == "Sunday"] <- "Weekend"
+# build weekend data set
+mean_steps_we <- aggregate(activity_complete$steps[activity_complete$day_type=="Weekend"], list(activity_complete$interval[activity_complete$day_type=="Weekend"]), mean)
+# build weekday data set 
+mean_steps_wd <- aggregate(activity_complete$steps[activity_complete$day_type=="Weekday"], list(activity_complete$interval[activity_complete$day_type=="Weekday"]), mean)
+
+# plot both datasets together
+
+d<-ggplot(mean_steps_we,aes(Group.1,x))
+d<-d+geom_line()+xlab("Interval")+ylab("Mean Steps")+ggtitle("Weekend")
+d2<-ggplot(mean_steps_wd,aes(Group.1,x))
+d2<-d+geom_line()+xlab("Interval")+ylab("Mean Steps")+ggtitle("Weekday")
+library(grid)
+pushViewport(viewport(layout = grid.layout(2,1)))
+print(d, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(d2, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+```
+
+
